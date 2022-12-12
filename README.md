@@ -309,3 +309,105 @@ export class CreateRestaurantDto {
 ```
 
 class-validator를 필수값에 대한 에러뿐만 아니라 타입, 길이 등 좀 더 다양한 유효성 검사를 추가할 수 있다.
+
+## 도커 컨테이너 맵핑 시 위치
+
+-p 라고 속성을 줄 때 host-port : container-port 순서로 주게된다.
+
+## typeorm하고 연결하기
+
+```bash
+npm install --save @nestjs/typeorm typeorm pg
+```
+
+typeorm은 typeorm 모듈, pg는 postgres를 사용하기 위한 드라이버다. @nestjs/typeorm은 nest에서 타입orm을 사용하기 위한 드라이버다
+
+```ts
+// app.module.ts
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: 'host ip',
+      port: host port,
+      username: 'username',
+      password: 'user password',
+      database: 'database name',
+      synchronize: true,
+      logging: true,
+    }),
+  ],
+  controllers: [],
+  providers: [],
+})
+```
+
+위와 같이 typeOrmModule에 값을 전달해주면 된다.
+
+## dotenv
+
+기본적으로 nest에서는 @nestjs/config를 사용해서 dotenv를 활용할 수 있다.
+
+```bash
+npm i --save @nestjs/config
+```
+
+위와 같이 설치하고 아래처럼 설정하면 된다.
+
+```ts
+ConfigModule.forRoot({
+  isGlobal: true,
+  envFilePath: process.env.NODE_ENV === 'dev' ? '.env.dev' : '.env.test',
+  ignoreEnvFile: process.env.NODE_ENV === 'prod',
+});
+```
+
+isGlobal을 true로 설정해서 어떤 모듈 안에서도 사용할 수 있도록 했고, 환경변수에 따라서 적용시킬 env를 변경할 수 있다.
+
+ignoreEnvFile: process.env.NODE_ENV === 'prod'을 적용시켜주면 prod 환경일 때는 env파일을 무시하게 된다. 다른 방법으로 주입시켜주면 됨. (호스팅 사이트 등에서 주입)
+
+마지막으로 env 파일을 작성한 후 typeorm 모듈에 넣어주면 된다.
+
+```ts
+TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: process.env.DB_HOST,
+      port: +process.env.DB_PORT,
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      synchronize: true,
+      logging: true,
+    }),
+```
+
+또한 config의 유효성 검사도 할 수 있다.
+
+```bash
+npm i joi
+```
+
+joi는 자바스크립트용 강력한 스키마 설명 언어 및 데이터 유효성 검사기다.
+
+```ts
+import * as Joi from 'joi';
+// Joi가 자바스크립트로 만들어져 있기 때문에 위와같은 형태로 import
+
+ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: process.env.NODE_ENV === 'dev' ? '.env.dev' : '.env.test',
+      ignoreEnvFile: process.env.NODE_ENV === 'prod',
+      validationSchema: Joi.object({
+        NODE_ENV: Joi.string().valid('dev', 'prod', 'test').required(),
+        DB_HOST: Joi.string().required(),
+        DB_PORT: Joi.string().required(),
+        DB_USERNAME: Joi.string().required(),
+        DB_PASSWORD: Joi.string().required(),
+        DB_NAME: Joi.string().required(),
+      }),
+    }),
+```
+
+그 후 ConfigModule에 validationSchema을 Joi로 만들어 전달해주면 된다.
