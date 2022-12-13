@@ -411,3 +411,226 @@ ConfigModule.forRoot({
 ```
 
 그 후 ConfigModule에 validationSchema을 Joi로 만들어 전달해주면 된다.
+
+## entity
+
+엔티티는 데이터베이스에 저장되는 데이터의 형태로 보여주는 모델
+
+```graphql
+import { Field, ObjectType } from '@nestjs/graphql';
+
+@ObjectType()
+export class Restaurant {
+  @Field((type) => String)
+  name: string;
+
+  @Field((type) => Boolean)
+  isVegan: boolean;
+
+  @Field((type) => String)
+  address: string;
+
+  @Field((type) => String)
+  ownerName: string;
+}
+```
+
+기존에 entity라고 이름 붙여준 것은 graphql에서 사용하는 형태(graphql에서 사용하는 schema)다.
+
+```ts
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+
+@Entity()
+export class User {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  firstName: string;
+
+  @Column()
+  lastName: string;
+
+  @Column()
+  isActive: boolean;
+}
+```
+
+타입orm에서 엔티티를 만드는 방법은 위와 같다. 매우 비슷해서 돌려쓸 수 있다.
+
+```ts
+import { Field, ObjectType } from '@nestjs/graphql';
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@ObjectType()
+@Entity()
+export class Restaurant {
+  @Field((type) => Number)
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Field((type) => String)
+  @Column()
+  name: string;
+
+  @Field((type) => Boolean)
+  @Column()
+  isVegan: boolean;
+
+  @Field((type) => String)
+  @Column()
+  address: string;
+
+  @Field((type) => String)
+  @Column()
+  ownerName: string;
+}
+```
+
+위와 같이 Graphql schema와 typeorm의 entity를 한번에 정의가 가능하다.
+
+## db에 추가하기
+
+위에서 정의한 것을 어떻게 디비에 추가할 수 있을까?
+
+```ts
+TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: process.env.DB_HOST,
+      port: +process.env.DB_PORT,
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      synchronize: process.env.NODE_ENV !== 'prod',
+      logging: true,
+      entities: [Restaurant],
+    }),
+```
+
+typeorm 모듈에 entities에 엔티티를 추가해주면(synchronize: true로 해서 알아서 싱크를 맞춰줌) 디비에 추가된 것을 알 수 있다.
+
+## Active Record vs Data Mapper
+
+typeorm이 db와 상호작용 하는 방법으론 2가지 패턴이 있다. 하나는 Active Record 패턴이다.  
+Active Record 패턴은 정의한 모델을 통해서 데이터베이스에 접근할 수 있다.
+
+```ts
+import { BaseEntity, Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+
+@Entity()
+export class User extends BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  firstName: string;
+
+  @Column()
+  lastName: string;
+
+  @Column()
+  isActive: boolean;
+}
+```
+
+위처럼 BaseEntity를 가져와서 상속받은 후 아래처럼 사용한다.
+
+```ts
+const user = new User();
+user.firstName = 'Timber';
+user.lastName = 'Saw';
+user.isActive = true;
+await user.save();
+
+// example how to remove AR entity
+await user.remove();
+
+// example how to load AR entities
+const users = await User.find({ skip: 2, take: 5 });
+const newUsers = await User.findBy({ isActive: true });
+const timber = await User.findOneBy({ firstName: 'Timber', lastName: 'Saw' });
+```
+
+find, save 등은 다 BaseEntity를 상속받았기 때문에 사용 가능한 것이다.
+
+```ts
+export class User extends BaseEntity {
+    (...)
+    static findByName(firstName: string, lastName: string) {
+        return this.createQueryBuilder("user")
+            .where("user.firstName = :firstName", { firstName })
+            .andWhere("user.lastName = :lastName", { lastName })
+            .getMany()
+    }
+}
+```
+
+만약 findByName이라는 메소드를 만들고 싶다면 User 클래스 안에서 정의하면 된다.
+
+Data Mapper는 repository 라는 분리된 클래스에서 모든 쿼리 메소드를 정의해 사용하는 것이다. 즉 레포지토리를 이용해서 db와 상호작용 한다.  
+데이터 맵퍼에서 엔티티들은 매우 멍청해서, 속성을 그냥 정의하고, 쓸데없는 메소드들이 있을 수 있습니다.
+
+```ts
+const userRepository = dataSource.getRepository(User);
+
+// example how to save DM entity
+const user = new User();
+user.firstName = 'Timber';
+user.lastName = 'Saw';
+user.isActive = true;
+await userRepository.save(user);
+
+// example how to remove DM entity
+await userRepository.remove(user);
+
+// example how to load DM entities
+const users = await userRepository.find({ skip: 2, take: 5 });
+const newUsers = await userRepository.findBy({ isActive: true });
+const timber = await userRepository.findOneBy({
+  firstName: 'Timber',
+  lastName: 'Saw',
+});
+```
+
+위처럼 repository를 불러와서 사용합니다.
+Data Mapper는 대규모 앱에서 더 효과적인 유지 관리에 도움되고, Active Record 방식은 작은 앱에서 잘 작동해 작업을 단순하게 유지하는데 도움이 된다.  
+강의에서 DataMapper를 사용하려는 이유는 Repository를 사용하는 모듈을 쓸 수 있기 때문이다. 그래서 해당 모듈로 어디서든 접근 가능해진다.(서비스나 테스트 등에서도)
+
+## Repository 삽입하기
+
+```ts
+const userRepository = dataSource.getRepository(User);
+```
+
+위와 같이 repository를 갖고 오는 방법을 정의했었는데, 각 모듈에 넣는 삽입하는 방식은 어떻게 될까?
+
+```ts
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Restaurant } from './entities/restaurants.entity';
+import { RestaurantResolver } from './restaurants.resolver';
+import { RestaurantService } from './restaurants.service';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([Restaurant])],
+  providers: [RestaurantResolver, RestaurantService],
+})
+export class RestaurantsModule {}
+```
+
+TypeOrmModule.forFeature에 배열로 entity 들을 전달해주면 repository로 삽입이 된다.
+
+```ts
+@Injectable()
+export class RestaurantService {
+  constructor(
+    @InjectRepository(Restaurant)
+    private readonly restaurants: Repository<Restaurant>,
+  ) {}
+  getAll(): Promise<Restaurant[]> {
+    return this.restaurants.find();
+  }
+}
+```
+
+그리고 서비스에서 InjectRepository(Restaurant)을 통해 repository를 가지고 오면 된다.

@@ -18,5 +18,5 @@ export class CreateRestaurantDto {
 
   @Field((type) => String)
   @IsString()
-  ownersName: string;
+  ownerName: string;
 }
