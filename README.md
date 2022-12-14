@@ -634,3 +634,184 @@ export class RestaurantService {
 ```
 
 그리고 서비스에서 InjectRepository(Restaurant)을 통해 repository를 가지고 오면 된다.
+
+## Mapped Types
+
+엔티티에 새로운 필드가 추가되었는데, 관련이 있는 dto들을 한번에 수정할 수는 없을까? 이때 활용할 수 있는 것이 Mapped type이다.
+
+- PartialType: 필드 부분들을 옵셔널하게 바꿔줌
+- PickType: 몇가지만 선택해서 새로 만듬
+- OmitType: 몇가지만 생략해서 새로만듬
+
+여기서 중요한건 모두 InputType이 되어야 한다는 것이다
+
+```ts
+@InputType()
+export class CreateRestaurantDto extends OmitType(Restaurant, ['id']) {}
+```
+
+가령 위와 같이 정의했다고 하면 에러가 난다.
+
+> Input Object type CreateRestaurantDto must define one or more fields
+
+이것은 InputType이 아니기 때문에 나타나는 에러다. Input 타입으로 바꿔주려면 2가지 방법이 있다. 하나는 Mapped type의 3번째 매개변수에 InputType을 넣어주는 것이다. 그러면 타입이 변환되서 사용할 수 있게 된다.
+
+```ts
+@InputType()
+export class CreateRestaurantDto extends OmitType(
+  Restaurant,
+  ['id'],
+  InputType,
+) {}
+```
+
+그게 아니라면 dto에 input type을 붙이고 isAbstract를 추가한다.
+
+```ts
+@InputType({ isAbstract: true })
+@ObjectType()
+@Entity()
+export class Restaurant {
+  @Field((type) => Number)
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Field((type) => String)
+  @Column()
+  @Length(2, 10)
+  @IsString()
+  name: string;
+
+  @Field((type) => Boolean)
+  @Column()
+  @IsBoolean()
+  isVegan: boolean;
+
+  @Field((type) => String)
+  @Column()
+  @IsString()
+  address: string;
+
+  @Field((type) => String)
+  @Column()
+  @IsString()
+  ownerName: string;
+
+  @Field((type) => String)
+  @Column()
+  @IsString()
+  categoryName: string;
+}
+```
+
+맨 위에 InputType을 추가하고 validation 부분을 각 필드에 추가했다.  
+"isAbstract: true"을 추가하지 않으면 어떻게 될까 ?  
+Schema must contain uniquely named types but contains multiple types named "Restaurant"라고 뜬다.  
+InputType과 ObjectType 두가지를 만들어서 다 스키마가 추가되려고 하니 이름이 중복되기 때문이다.
+
+> isAbstract를 지정하면 현재 클래스를 Graphql 스키마에 추가하지 않고, 어딘가에 복사해서 쓰는 용도로만 사용하도록 지정한다.
+
+## 기본값 넣기
+
+```ts
+@Field((type) => Boolean, { defaultValue: true })
+@Column({ default: true })
+@IsOptional()
+@IsBoolean()
+isVegan: boolean;
+```
+
+위와 같은 컬럼이 있다고 하자.  
+Field는 graphql을 위해서 설정하는 것이고, column은 typeorm을 위해서 설정하는 것이다. optional을 줘서 값이 안들어가도 되도록 만들었다.
+
+## Update 시 한번에 인수 받기
+
+업데이트를 할 때는 id가 필요하다 그렇다면 인수를 두개 받아야 할까?
+
+```ts
+@InputType()
+export class UpdateRestaurantInputType extends PartialType(
+  CreateRestaurantDto,
+) {}
+
+@InputType()
+export class UpdateRestaurantDto {
+  @Field((type) => Number)
+  id: number;
+
+  @Field((type) => UpdateRestaurantInputType)
+  data: UpdateRestaurantInputType;
+}
+```
+
+위와 같이 Partial 타입으로 데이터를 받는 Input 타입을 만들고, dto로 사용할 Input 타입을 하나 더 만들어서 사용하면 하나의 객체로 업데이트할 데이터를 받을 수 있다.
+
+## 업데이트 시 조심할 것
+
+업데이트 때 객체라 생각해서 그냥 전달하면 안된다.
+
+```ts
+updateRestaurant({ id, data }: UpdateRestaurantDto) {
+    console.log(data);
+    return this.restaurants.update(id, data);
+  }
+// [Object: null prototype] {
+// name: 'changed!!',
+//  isVegan: true,
+//  address: '부산'
+}
+```
+
+위와 같다면 에러가 날 것이다.
+Object: null prototype은 무엇일까? 일반적으로 객체로 만들면 객체에 대한 메소드들을 다 상속받을 것이다. 하지만 그런것들이 필요없다면? 리소스 등을 아끼기 위해서 Object: null prototype으로 만들어 주면된다.
+
+```ts
+updateRestaurant({ id, data }: UpdateRestaurantDto) {
+    console.log(data);
+    return this.restaurants.update(id, {...data});
+  }
+```
+
+그래서 위처럼 객체로 전달해주어야 한다.
+
+## 공통으로 사용할 Common 모듈 만들기
+
+엔티티에는 공통으로 들어가는 부분이 있다. id, createdAt, updatedAt인데 common 모듈로 이 부분들을 공통으로 처리할 수 있다.
+
+```ts
+import {
+  CreateDateColumn,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
+export class CoreEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+```
+
+common 모듈을 만들고, 위와 같이 엔티티를 정의한다.
+다 상속해서 사용할 것이니 entity타입을 주지는 않았다.
+
+```ts
+@Entity()
+export class User extends CoreEntity {
+  @Column()
+  email: string;
+
+  @Column()
+  password: string;
+
+  @Column()
+  role: UserRole;
+}
+```
+
+그리고 위에서 처럼 User가 상속해서 사용하면 된다.
