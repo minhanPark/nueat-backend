@@ -815,3 +815,12 @@ export class User extends CoreEntity {
 ```
 
 그리고 위에서 처럼 User가 상속해서 사용하면 된다.
+
+## private과 readonly 역할
+
+```ts
+constructor(private readonly usersService: UserService) {}
+```
+
+위처럼 private과 readonly를 동시에 넣는 이유는 무엇일까?  
+private은 다른 클래스에서 접근하지 못하게 하고, readonly를 속성을 readonly 속성을 줘서 실수로라도 오버라이드 하지 않도록 하게 해준다.
