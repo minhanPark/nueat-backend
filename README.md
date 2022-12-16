@@ -824,3 +824,23 @@ constructor(private readonly usersService: UserService) {}
 
 위처럼 private과 readonly를 동시에 넣는 이유는 무엇일까?  
 private은 다른 클래스에서 접근하지 못하게 하고, readonly를 속성을 readonly 속성을 줘서 실수로라도 오버라이드 하지 않도록 하게 해준다.
+
+## Listeners and Subscribers
+
+> 모든 엔티티는 특정 이벤트를 수신대기하는 메소드를 만들 수가 있습니다. 수신하려는 이벤트에 따라서 특수 데코데리어로 해당 메소드를 표시해야합니다.
+
+비밀번호는 hash가 되어야 하니 삽입되기 전에 hash되어야한다.
+
+```ts
+@BeforeInsert()
+  async hashPassword(): Promise<void> {
+    try {
+      this.password = await bcrypt.hash(this.password, 10);
+    } catch (e) {
+      console.log(e);
+      throw new InternalServerErrorException();
+    }
+  }
+```
+
+그래서 위와 같이 정의할 수 있다
