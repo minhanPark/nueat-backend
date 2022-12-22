@@ -14,5 +14,6 @@ import { UserService } from './users.service';
   // 또 providers에 ConfigService를 넣는것은 제대로 작동한다.
   imports: [TypeOrmModule.forFeature([User])],
   providers: [UserService, UserResolver],
+  exports: [UserService],
 })
 export class UsersModule {}

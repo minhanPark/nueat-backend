@@ -879,3 +879,56 @@ async function bootstrap() {
 bootstrap();
 ``;
 ```
+
+> function으로 한 것들만 app.use를 사용할 수 있다. class 미들웨어를 사용하려면 app.module에서 처리해야한다.
+
+```ts
+@Injectable()
+export class JwtMiddleware implements NestMiddleware {
+  constructor(private readonly jwtService: JwtService) {}
+  use(req: Request, res: Response, next: NextFunction) {
+    console.log(req.headers);
+    next();
+  }
+}
+```
+
+클래스 형태로 바꾸려면 위와 같이 바꿔야함.
+
+```ts
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(JwtMiddleware)
+      .forRoutes({ path: '/graphql', method: RequestMethod.ALL });
+  }
+}
+```
+
+앱모듈은 위와 같이 사용해서 미들웨어를 특정 path에서 사용할 수 있다
+
+## Context
+
+Context는 함수로 정의되고, 각 request에 대해서 context를 사용할 수 있다
+
+```ts
+GraphQLModule.forRoot<ApolloDriverConfig>({
+  driver: ApolloDriver,
+  autoSchemaFile: true,
+  context: ({ req }) => ({ user: req['user'] }),
+});
+```
+
+GraphQLModule에서 context를 위와 같이 설정해 줄 수 있다. req['user']는 이미 미들웨어에서 넣어줬기 때문에 가능하다.
+
+```ts
+me(@Context() context) {
+    if (!context.user) {
+      return;
+    } else {
+      return context.user;
+    }
+  }
+```
+
+사용할 때는 위와 같이 Context를 불러와서 사용하면 된다.
