@@ -848,3 +848,34 @@ private은 다른 클래스에서 접근하지 못하게 하고, readonly를 속
 ## Static 모듈과 Dynamic 모듈
 
 정적 모듈은 기본적으로 설정이 같은 모듈이다. 동적 모듈은 forRoot 등을 통해서 달라지는 설정들을 넣어서 정적 모듈을 만들어준다.
+
+## 미들웨어
+
+미들웨어는 라우트 핸들러 전에 호출되는 함수  
+express에서 사용할 때 처럼 req, res, next 등을 사용한다.
+
+```ts
+import { NextFunction, Request, Response } from 'express';
+
+export function JwtMiddleware(req: Request, res: Response, next: NextFunction) {
+  console.log(req.headers);
+  // 키를 대문자로 보내도 소문자로 처리되서 온다.
+  next();
+}
+```
+
+위와 같이 미들웨어를 만들었으면, 모듈 전체에 적용되도록 하든 지 아니면 특정 모듈에 적용되도록 할 수 있다.  
+전체에 적용하는 방법은 bootstrap에 적용시키면 된다.
+
+```ts
+//main.ts
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(new ValidationPipe());
+  app.use(JwtMiddleware);
+  await app.listen(3000);
+}
+bootstrap();
+``;
+```
