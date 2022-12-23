@@ -932,3 +932,102 @@ me(@Context() context) {
 ```
 
 사용할 때는 위와 같이 Context를 불러와서 사용하면 된다.
+
+## AuthGuard
+
+AuthGuard를 만들땐 CanActivate를 활용할 수 있다.
+
+```ts
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { GqlExecutionContext } from '@nestjs/graphql';
+
+@Injectable()
+export class AuthGuard implements CanActivate {
+  canActivate(context: ExecutionContext) {
+    // 가져오는 context는 http의 context이다. 그래서 graphql에서 사용하려면 graphql context로 바꿔줘야 한다.
+    const gqlContext = GqlExecutionContext.create(context).getContext();
+    const user = gqlContext['user'];
+    if (!user) {
+      return false;
+    }
+    return true;
+  }
+}
+```
+
+true면 통과하고, false면 통과하지 못한다.
+
+> 여기서 DI 등이 필요 없어서 App.module에서는 Auth모듈을 import할 필요는 없었다.
+
+```ts
+@Query((returns) => User)
+  @UseGuards(AuthGuard)
+  me() {}
+```
+
+사용할 때는 위에처럼 UseGuards를 사용하면 된다.
+
+## 데코레이터 만들기
+
+```ts
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { GqlExecutionContext } from '@nestjs/graphql';
+
+export const AuthUser = createParamDecorator(
+  (data: unknown, context: ExecutionContext) => {
+    const gqlContext = GqlExecutionContext.create(context).getContext();
+    const user = gqlContext['user'];
+    return user;
+  },
+);
+```
+
+위와 같이 간편하게 데코레이터를 만들 수 있다.  
+context는 다시 gql껄로 변경 시켰음.
+
+```ts
+me(@AuthUser() authUser: User) {
+    return authUser;
+  }
+```
+
+위와 같이 만들었기 때문에 기존에 사용하면 params 데코레이터 처럼 사용하면 된다
+
+## 비밀번호는 왜 해시되지 않았을까?
+
+```ts
+@BeforeInsert()
+@BeforeUpdate()
+  async hashPassword(): Promise<void> {
+    try {
+      this.password = await bcrypt.hash(this.password, 10);
+    } catch (e) {
+      console.log(e);
+      throw new InternalServerErrorException();
+    }
+  }
+```
+
+위와 같이 listener가 있을 때에 아래 함수를 실행시켰다고 하자.
+
+```ts
+async editProfile(userId: number, editProfileInput: EditProfileInput) {
+    return this.users.update(userId, { ...editProfileInput });
+  }
+```
+
+비밀번호는 해싱되서 드가지 않는다. 이유는 모델에서 아무것도 수정하지 않았기 때문이다. 모델에서 변경되어야 리스너들이 작동하는데, update쿼리는 바로 db에 쿼리를 보내기 때문이다.  
+그래서 비밀번호 해싱 등의 데이터가 들어가기 전에 수정할 것들이 있다면 아래처럼 해야한다.
+
+```ts
+async editProfile(userId: number, { email, password }: EditProfileInput) {
+    const user = await this.users.findOne({ where: { id: userId } });
+    if (email) {
+      user.email = email;
+    }
+    if (password) {
+      user.password = password;
+    }
+    return this.users.save(user);
+  }
+```
