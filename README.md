@@ -1031,3 +1031,131 @@ async editProfile(userId: number, { email, password }: EditProfileInput) {
     return this.users.save(user);
   }
 ```
+
+## 관계설정하기(OneToOne)
+
+```ts
+import { Field, InputType, ObjectType } from '@nestjs/graphql';
+import { CoreEntity } from 'src/common/entities/core.entity';
+import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
+import { User } from './user.entity';
+
+@InputType({ isAbstract: true })
+@ObjectType()
+@Entity()
+export class Verification extends CoreEntity {
+  @Column()
+  @Field((type) => String)
+  code: string;
+
+  @OneToOne((type) => User)
+  @JoinColumn()
+  user: User;
+}
+```
+
+위에 Verification과 User를 OneToOne으로 관계설정했다.  
+JoinColumn이 추가된 엔티티쪽에 관계의 id가 생긴다.  
+실제로 프리즈마를 사용할 땐 userId 컬럼이 생기지는 않았는데 typeOrm에서는 userId가 생기는 것을 확인할 수 있었다.
+
+## 관계불러오기
+
+```ts
+const verification = await this.verifications.findOne({
+  where: {
+    code,
+  },
+});
+```
+
+위의 verification을 확인해보자.
+
+```
+Verification {
+  id: 1,
+  createdAt: 2022-12-25T16:38:40.928Z,
+  updatedAt: 2022-12-25T16:38:40.928Z,
+  code: '5e1fc043-26c1-4325-946e-047a98725083'
+}
+```
+
+위와 같이 나타날 것이다.  
+db에는 userId가 있는데 왜 나타나지 않는 것일까?  
+관계를 불러오는 것은 기본적으로 리소스가 많이 들기 때문에 따로 추가하지 않으면 불러오지 않는다.
+
+```ts
+const verification = await this.verifications.findOne({
+  where: {
+    code,
+  },
+  loadRelationIds: true,
+});
+```
+
+loadRelationIds를 true로 주면 관계가 설정된 entity의 id를 가져온다.
+
+```
+Verification {
+  id: 1,
+  createdAt: 2022-12-25T16:38:40.928Z,
+  updatedAt: 2022-12-25T16:38:40.928Z,
+  code: '5e1fc043-26c1-4325-946e-047a98725083',
+  user: 3
+}
+```
+
+중요한건 user: 3라는 것이다.(userId아님)  
+entity에서 user라고 관계를 맺었기 때문인 것이다.  
+만약 id가 아니라 user 객체가 필요하다면 아래처럼 바꿔주면 된다.
+
+```ts
+const verification = await this.verifications.findOne({
+  where: {
+    code,
+  },
+  relations: ['user'],
+});
+```
+
+relations를 설정해주면 user에 id가 아니라 user객체가 들어간다.
+
+```ts
+if (verification) {
+  verification.user.verified = true;
+  this.users.save(verification.user);
+}
+```
+
+그다음에 verified의 값을 위와 같이 고친 후에 save했는데 잘 적용되었다.  
+해당 user가 누구인 지 잘 인식하고 있는 것 같다.
+
+## 비밀번호가 변경되는 이슈 해결
+
+```ts
+if (verification) {
+  verification.user.verified = true;
+  this.users.save(verification.user);
+  return true;
+}
+```
+
+해당 코드에 user에는 비밀번호가 담겨있다. 그래서 비밀번호가 바뀌는 이슈가 생김.  
+첫번째 방법은 save를 쓰는것이 아니라 update를 쓰는 것이다. 그러면 db에 쿼리를 바로 날리기 때문에 해시가 변화되지 않을 것이다.  
+두번째 방법은 비밀번호를 속성 변경해주는 것이다.
+
+```ts
+@Column({ select: false })
+@Field((type) => String)
+password: string;
+```
+
+기본적으로 select는 true인데 select를 false로 하면 user를 불러올 때 값을 가져오지 않는다.
+
+```ts
+const user = await this.users.findOne({
+  where: { email },
+  select: ['password', 'id'],
+});
+```
+
+만약 비밀번호가 필요한 순간이 오면 select로 password를 넣어줘야한다.(다른 필요한 것들도 같이 select에 넣어줘야함)

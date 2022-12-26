@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
+import { Verification } from './entities/verification.entity';
 import { UserResolver } from './users.resolver';
 import { UserService } from './users.service';
 
@@ -12,7 +13,7 @@ import { UserService } from './users.service';
   // 이런 에러가 뜨는데
   // ConfigModule로 하면 정상적으로 작동함
   // 또 providers에 ConfigService를 넣는것은 제대로 작동한다.
-  imports: [TypeOrmModule.forFeature([User])],
+  imports: [TypeOrmModule.forFeature([User, Verification])],
   providers: [UserService, UserResolver],
   exports: [UserService],
 })
