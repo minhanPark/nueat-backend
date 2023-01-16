@@ -125,7 +125,7 @@ export class UserService {
     } catch (error) {
       return {
         ok: false,
-        error,
+        error: '프로필을 업데이트 할 수 없습니다.',
       };
     }
   }
@@ -153,7 +153,7 @@ export class UserService {
     } catch (error) {
       return {
         ok: false,
-        error,
+        error: 'Verification에 실패했습니다.',
       };
     }
   }
