@@ -1159,3 +1159,102 @@ const user = await this.users.findOne({
 ```
 
 만약 비밀번호가 필요한 순간이 오면 select로 password를 넣어줘야한다.(다른 필요한 것들도 같이 select에 넣어줘야함)
+
+## 관계 설정하기 (OneToMany)
+
+우버 이츠의 경우 카테고리가 많은 레스토랑을 가진다(카테고리 1 : 레스토랑 N)
+
+```ts
+export class Category extends CoreEntity {
+  @Field((type) => [Restaurant])
+  @OneToMany((type) => Restaurant, (restaurant) => restaurant.category)
+  restaurants: Restaurant[];
+}
+```
+
+그래서 OneToMany라고 카테고리에 적어주고, restaurants라는 필드를 만들어 준다.  
+| id | createdAt | updatedAt | name | coverImg |  
+디비버를 확인하니 위와 같이 생성되는 것을 확인했다.
+
+```ts
+export class Restaurant extends CoreEntity {
+  @Field((type) => Category)
+  @ManyToOne((type) => Category, (category) => category.restaurants)
+  category: Category;
+}
+```
+
+Many 부분에 포함되는 Restaurant는 ManyToOne라고 적어주고, category에 있는 컬럼들을 추가해준다.  
+| id | createdAt | updatedAt | name | coverImg | address | categoryId |  
+디비버를 확인하니 위와 같이 생성되는 것을 확인했다.
+
+> 즉 디비상으로는 restaurants에서는 one으로 접근할 수 있는 id가 생기고, category에서는 many로 접근하는 것은 생기지 않음.
+
+## APP_GUARD
+
+nest에서는 기본적으로 APP_GUARD라고 가드를 제공한다.
+
+```ts
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { GqlExecutionContext } from '@nestjs/graphql';
+import { Reflector } from '@nestjs/core';
+import { AllowedRoles } from './role.decorator';
+import { User } from 'src/users/entities/user.entity';
+
+@Injectable()
+export class AuthGuard implements CanActivate {
+  constructor(private readonly reflector: Reflector) {}
+  canActivate(context: ExecutionContext) {
+    const roles = this.reflector.get<AllowedRoles>(
+      'roles',
+      context.getHandler(),
+    );
+    if (!roles) {
+      return true;
+    }
+    // 가져오는 context는 http의 context이다. 그래서 graphql에서 사용하려면 graphql context로 바꿔줘야 한다.
+    const gqlContext = GqlExecutionContext.create(context).getContext();
+    const user: User = gqlContext['user'];
+    if (!user) {
+      return false;
+    }
+    if (roles.includes('Any')) {
+      return true;
+    }
+    return roles.includes(user.role);
+  }
+}
+```
+
+만들어둔 가드 클래스이다.
+
+```ts
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { AuthGuard } from './auth.guard';
+
+@Module({
+  providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
+})
+export class AuthModule {}
+```
+
+해당 부분을 useClass에 전달해두고, AppModule에 AuthModule을 추가하고 나면 매 요청마다 가드가 실행된다.
+
+```ts
+const roles = this.reflector.get<AllowedRoles>('roles', context.getHandler());
+```
+
+이 부분이 SetMetadata로 설정했을 때 갖고오는 부분이다.  
+reflector의 타입에 배열을 붙이는게 맞는게 아닌가 싶지만 일단 강의따라서 넘어 갔다.
+
+```ts
+import { SetMetadata } from '@nestjs/common';
+import { UserRole } from 'src/users/entities/user.entity';
+
+export type AllowedRoles = keyof typeof UserRole | 'Any';
+
+export const Role = (roles: AllowedRoles[]) => SetMetadata('roles', roles);
+```
+
+그래서 사용할 때는 Role(["Any"]) 이런식으로 사용하면 된다.

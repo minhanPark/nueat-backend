@@ -19,6 +19,7 @@ import { JwtMiddleware } from './jwt/jwt.middleware';
 import { AuthModule } from './auth/auth.module';
 import { Verification } from './users/entities/verification.entity';
 import { MailModule } from './mail/mail.module';
+import { Category } from './restaurants/entities/category.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -35,7 +36,7 @@ import { MailModule } from './mail/mail.module';
         TOKEN_SECRET: Joi.string().required(),
         MAILGUN_API_KEY: Joi.string().required(),
         MAILGUN_DOMAIN: Joi.string().required(),
-        MAILGUN_FROM_EMAIL: Joi.string().required()
+        MAILGUN_FROM_EMAIL: Joi.string().required(),
       }),
     }),
     GraphQLModule.forRoot<ApolloDriverConfig>({
@@ -52,7 +53,7 @@ import { MailModule } from './mail/mail.module';
       database: process.env.DB_NAME,
       synchronize: process.env.NODE_ENV !== 'prod',
       logging: process.env.NODE_ENV !== 'prod',
-      entities: [User, Verification],
+      entities: [User, Verification, Restaurant, Category],
     }),
     UsersModule,
     JwtModule.forRoot({
@@ -61,8 +62,10 @@ import { MailModule } from './mail/mail.module';
     MailModule.forRoot({
       apiKey: process.env.MAILGUN_API_KEY,
       domain: process.env.MAILGUN_DOMAIN,
-      fromEmail: process.env.MAILGUN_FROM_EMAIL
+      fromEmail: process.env.MAILGUN_FROM_EMAIL,
     }),
+    RestaurantsModule,
+    AuthModule,
   ],
   controllers: [],
   providers: [],
