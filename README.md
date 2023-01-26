@@ -1258,3 +1258,24 @@ export const Role = (roles: AllowedRoles[]) => SetMetadata('roles', roles);
 ```
 
 그래서 사용할 때는 Role(["Any"]) 이런식으로 사용하면 된다.
+
+## 관계 가져올 때 RelationId 이용하기
+
+```ts
+@Field((type) => User)
+@ManyToOne((type) => User, (user) => user.restaurants, {
+  onDelete: 'CASCADE',
+})
+owner: User;
+
+```
+
+필드를 보면 N:1의 관계가 설정되어있고, owner의 타입은 User다. 하지만 id만 갖고온다면 owner의 타입은 number가 될 것이다.  
+owner의 타입을 User | number라고 해야할까?
+
+```ts
+@RelationId((restaurant: Restaurant) => restaurant.owner)
+ownerId: number;
+```
+
+이렇게 설정해주면 계속 ownerId가 오는 것을 확인할 수 있다.
