@@ -1279,3 +1279,20 @@ ownerId: number;
 ```
 
 이렇게 설정해주면 계속 ownerId가 오는 것을 확인할 수 있다.
+
+## ResolveField
+
+graphql에서 computed field를 만들 수 있다.  
+db에는 존재하지 않고 Graphql 스키마에만 존재하며 매 요청마다 사용자에게 맞게 계산해서 보내준다.
+
+```ts
+@Resolver((of) => Category)
+export class CategoryResolver {
+  constructor(private readonly restaurantService: RestaurantService) {}
+
+  @ResolveField((type) => Number)
+  restaurantCount(): number {
+    return 70;
+  }
+}
+```
