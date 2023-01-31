@@ -1296,3 +1296,75 @@ export class CategoryResolver {
   }
 }
 ```
+
+## 페이지네이션
+
+```ts
+const restaurants = await this.restaurants.find({
+  where: {
+    category: {
+      id: category.id,
+    },
+  },
+  take: 3,
+  skip: (page - 1) * 3,
+});
+```
+
+take와 skip을 사용하면 pagination을 쉽게 구현할 수 있다.  
+관계를 불러올 때도 pagination을 할 수 있을까? 일단 강의에서는 따로 구분해서 사용하도록 했다.
+
+```ts
+const category = await this.categories.findOne({
+  where: { slug },
+});
+if (!category) {
+  return {
+    ok: false,
+    error: '카테고리를 찾을 수 없습니다.',
+  };
+}
+const restaurants = await this.restaurants.find({
+  where: {
+    category: {
+      id: category.id,
+    },
+  },
+  take: 3,
+  skip: (page - 1) * 3,
+});
+category.restaurants = restaurants;
+```
+
+위처럼 카테고리를 찾고, 해당 카테고리에 맞는 레스토랑을 페이지에 맞게 불러와서 카테고리에 넣어준다.
+
+```ts
+import { Field, InputType, ObjectType } from '@nestjs/graphql';
+import { CoreOutput } from './output.dto';
+
+@InputType()
+export class PaginationInput {
+  @Field((type) => Number, { defaultValue: 1 })
+  page: number;
+}
+
+@ObjectType()
+export class PaginationOutput extends CoreOutput {
+  @Field((type) => Number, { nullable: true })
+  totalPages?: number;
+}
+```
+
+페이지를 구성하는 클래스를 만들어서 필요한 곳에서 상속해서 사용하면 공통적으로 사용할수 있다.
+
+```ts
+const [restaurants, totalResults] = await this.restaurants.findAndCount({
+  where: {
+    name: ILike(`%${query}%`),
+  },
+  skip: (page - 1) * 3,
+  take: 3,
+});
+```
+
+findAndCount을 사용하면 배열을 리턴하는데, 결과값과 갯수를 둘다 리턴한다.
