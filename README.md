@@ -1368,3 +1368,34 @@ const [restaurants, totalResults] = await this.restaurants.findAndCount({
 ```
 
 findAndCount을 사용하면 배열을 리턴하는데, 결과값과 갯수를 둘다 리턴한다.
+
+## Column의 타입
+
+```ts
+@InputType('DishOptionInputType', { isAbstract: true })
+@ObjectType()
+class DishOption {
+  @Field((type) => String)
+  name: string;
+
+  @Field((type) => [String], { nullable: true })
+  choices?: string[];
+
+  @Field((type) => Int)
+  extra: number;
+}
+```
+
+위와 같이 Dishoption을 추가했다.  
+entities에 추가하지 않았기 때문에 해당 테이블은 생기지 않았음.  
+강의에서는 간단한건 json 형태 등으로 받으면 된다고 생각해서 그런것 같다.
+
+제목처럼 column에는 타입을 지정할 수 있는데, 일반적으로 데이터베이스 지원 Column 타입을 모두 지원한다.
+
+```ts
+@Field((type) => [DishOption], { nullable: true })
+@Column({ type: 'json', nullable: true })
+options?: DishOption[];
+```
+
+그래서 json 형태로 옵션들을 보낼 생각인것같다.
