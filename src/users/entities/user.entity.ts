@@ -10,6 +10,7 @@ import { BeforeInsert, BeforeUpdate, Column, Entity, OneToMany } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { IsBoolean, IsEmail, IsEnum, IsString } from 'class-validator';
 import { Restaurant } from 'src/restaurants/entities/restaurants.entity';
+import { Order } from 'src/orders/entities/order.entity';
 
 // type UserRole = 'client' | 'owner' | 'delivery';
 export enum UserRole {
@@ -47,6 +48,14 @@ export class User extends CoreEntity {
   @Field((type) => [Restaurant])
   @OneToMany((type) => Restaurant, (restaurant) => restaurant.owner)
   restaurants: Restaurant[];
+
+  @Field((type) => [Order])
+  @OneToMany((type) => Order, (order) => order.customer)
+  orders: Order[];
+
+  @Field((type) => [Order])
+  @OneToMany((type) => Order, (order) => order.dirver)
+  rides: Order[];
 
   @BeforeInsert()
   @BeforeUpdate()
